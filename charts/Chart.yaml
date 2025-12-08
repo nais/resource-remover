@@ -1,0 +1,7 @@
+apiVersion: v2
+name: resource-remover
+description: Mutating webhook that removes resource requests and limits from pods
+type: application
+version: 1.0.0
+sources:
+  - https://github.com/nais/resource-remover/tree/main/charts
