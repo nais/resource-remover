@@ -8,5 +8,5 @@ spec:
     - "{{ .Release.Name }}.{{ .Release.Namespace }}.svc"
     - "{{ .Release.Name }}.{{ .Release.Namespace }}.svc.cluster.local"
   issuerRef:
-    name: selfsigned-issuer
-    kind: ClusterIssuer
+    name: "{{ .Release.Name }}-selfsigned-issuer"
+    kind: Issuer
