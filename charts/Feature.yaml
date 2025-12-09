@@ -1,3 +1,7 @@
 environmentKinds:
   - tenant
   - management
+
+dependencies:
+- allOf:
+  - cert-manager
