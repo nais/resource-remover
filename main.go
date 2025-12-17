@@ -38,6 +38,27 @@ func handleMutate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Skip workloads with the skip annotation
+	if pod.Annotations != nil {
+		if val, ok := pod.Annotations["resource-remover.nais.io/skip"]; ok && val == "true" {
+			log.Printf("Skipping %s/%s due to skip annotation", pod.Namespace, pod.Name)
+			response := admissionv1.AdmissionReview{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "admission.k8s.io/v1",
+					Kind:       "AdmissionReview",
+				},
+				Response: &admissionv1.AdmissionResponse{
+					UID:     admissionReview.Request.UID,
+					Allowed: true,
+				},
+			}
+			respBytes, _ := json.Marshal(response)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(respBytes)
+			return
+		}
+	}
+
 	var patches []patchOperation
 
 	// Remove safe-to-evict=false annotation if present

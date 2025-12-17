@@ -13,6 +13,16 @@ A Kubernetes mutating admission webhook that removes CPU and memory requests/lim
 
 Kubernetes auto-sets `requests = limits` if limits exist but requests don't. We must remove both to achieve BestEffort QoS class.
 
+## Skipping workloads
+
+To exclude a workload from resource removal, add this annotation to the pod template:
+
+```yaml
+metadata:
+  annotations:
+    resource-remover.nais.io/skip: "true"
+```
+
 ## Effects
 
 - Pods become `BestEffort` QoS class
