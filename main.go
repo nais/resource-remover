@@ -306,6 +306,107 @@ func handleMutateHPA(w http.ResponseWriter, r *http.Request) {
 	w.Write(respBytes)
 }
 
+func handleMutateReplicas(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "failed to read body", http.StatusBadRequest)
+		return
+	}
+
+	var admissionReview admissionv1.AdmissionReview
+	if err := json.Unmarshal(body, &admissionReview); err != nil {
+		http.Error(w, "failed to unmarshal admission review", http.StatusBadRequest)
+		return
+	}
+
+	// Parse workload to check for skip annotation and get replicas
+	var workload struct {
+		Metadata struct {
+			Name        string            `json:"name"`
+			Namespace   string            `json:"namespace"`
+			Annotations map[string]string `json:"annotations"`
+		} `json:"metadata"`
+		Spec struct {
+			Replicas *int32 `json:"replicas"`
+		} `json:"spec"`
+	}
+	if err := json.Unmarshal(admissionReview.Request.Object.Raw, &workload); err != nil {
+		http.Error(w, "failed to unmarshal workload", http.StatusBadRequest)
+		return
+	}
+
+	kind := admissionReview.Request.Kind.Kind
+
+	// Check for skip annotation
+	if val, ok := workload.Metadata.Annotations["resource-remover.nais.io/skip"]; ok && val == "true" {
+		log.Printf("Skipping %s %s/%s due to skip annotation", kind, workload.Metadata.Namespace, workload.Metadata.Name)
+		response := admissionv1.AdmissionReview{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "admission.k8s.io/v1",
+				Kind:       "AdmissionReview",
+			},
+			Response: &admissionv1.AdmissionResponse{
+				UID:     admissionReview.Request.UID,
+				Allowed: true,
+			},
+		}
+		respBytes, _ := json.Marshal(response)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(respBytes)
+		return
+	}
+
+	var patches []patchOperation
+
+	// Set replicas to 1
+	if workload.Spec.Replicas == nil {
+		patches = append(patches, patchOperation{
+			Op:    "add",
+			Path:  "/spec/replicas",
+			Value: 1,
+		})
+	} else if *workload.Spec.Replicas != 1 {
+		patches = append(patches, patchOperation{
+			Op:    "replace",
+			Path:  "/spec/replicas",
+			Value: 1,
+		})
+	}
+
+	if len(patches) > 0 {
+		log.Printf("Setting %s %s/%s replicas to 1", kind, workload.Metadata.Namespace, workload.Metadata.Name)
+	}
+
+	patchBytes, err := json.Marshal(patches)
+	if err != nil {
+		http.Error(w, "failed to marshal patches", http.StatusInternalServerError)
+		return
+	}
+
+	patchType := admissionv1.PatchTypeJSONPatch
+	response := admissionv1.AdmissionReview{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "admission.k8s.io/v1",
+			Kind:       "AdmissionReview",
+		},
+		Response: &admissionv1.AdmissionResponse{
+			UID:       admissionReview.Request.UID,
+			Allowed:   true,
+			PatchType: &patchType,
+			Patch:     patchBytes,
+		},
+	}
+
+	respBytes, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, "failed to marshal response", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(respBytes)
+}
+
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -323,6 +424,7 @@ func main() {
 
 	http.HandleFunc("/mutate", handleMutate)
 	http.HandleFunc("/mutate-hpa", handleMutateHPA)
+	http.HandleFunc("/mutate-replicas", handleMutateReplicas)
 	http.HandleFunc("/healthz", handleHealth)
 
 	log.Printf("Starting resource-request-remover webhook on port %s", port)

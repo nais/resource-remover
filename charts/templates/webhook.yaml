@@ -49,3 +49,25 @@ webhooks:
           operator: NotIn
           values:
             - kube-system
+  - name: "{{ .Release.Name }}-replicas.nais.io"
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: Ignore
+    matchPolicy: Equivalent
+    reinvocationPolicy: IfNeeded
+    clientConfig:
+      service:
+        name: "{{ .Release.Name }}"
+        namespace: "{{ .Release.Namespace }}"
+        path: /mutate-replicas
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        resources: ["deployments", "statefulsets"]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - kube-system

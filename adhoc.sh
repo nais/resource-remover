@@ -1,15 +1,16 @@
 #!/bin/bash
-# cleanup.sh
-# Restarts all workloads and triggers HPA reconciliation so the mutating webhook can:
+# adhoc.sh
+# Triggers reconciliation so the mutating webhook can:
 # - Reduce resource requests to 20%
 # - Remove limits
 # - Disable HPAs (set min/max replicas to 1)
+# - Set Deployment/StatefulSet replicas to 1
 
 set -euo pipefail
 
 EXCLUDE_NAMESPACES="${EXCLUDE_NAMESPACES:-kube-system}"
 
-echo "=== Workload Restarter (for resource-remover webhook) ==="
+echo "=== Adhoc Reconciliation (for resource-remover webhook) ==="
 echo "Excluding namespaces: $EXCLUDE_NAMESPACES"
 echo ""
 
@@ -70,9 +71,9 @@ kubectl get pods -A -o json | jq -r --arg exclude "$EXCLUDE_PATTERN" '
   "  \(.namespace): \(.cpu_m)m"'
 echo ""
 
-restart_workloads() {
+trigger_workload_reconciliation() {
   local kind=$1
-  echo "=== Restarting ${kind}s ==="
+  echo "=== Triggering ${kind} reconciliation ==="
   
   kubectl get "$kind" --all-namespaces -o json | jq -r --arg exclude "$EXCLUDE_PATTERN" '
     .items[] | 
@@ -81,14 +82,27 @@ restart_workloads() {
   ' | while read -r ns name; do
     [ -z "$ns" ] && continue
     echo "  $ns/$name"
+    # Annotate to trigger webhook, then rollout restart to recreate pods
+    kubectl annotate "$kind" -n "$ns" "$name" resource-remover.nais.io/reconcile="$(date +%s)" --overwrite 2>/dev/null || true
     kubectl rollout restart "$kind" -n "$ns" "$name" 2>/dev/null || true
   done
 }
 
-# Restart all workload types
-restart_workloads "deployment"
-restart_workloads "statefulset" 
-restart_workloads "daemonset"
+# Trigger reconciliation for all workload types
+trigger_workload_reconciliation "deployment"
+trigger_workload_reconciliation "statefulset"
+
+# Daemonsets don't have replicas, just restart them
+echo "=== Restarting daemonsets ==="
+kubectl get daemonset --all-namespaces -o json | jq -r --arg exclude "$EXCLUDE_PATTERN" '
+  .items[] | 
+  select(.metadata.namespace | test($exclude) | not) |
+  "\(.metadata.namespace) \(.metadata.name)"
+' | while read -r ns name; do
+  [ -z "$ns" ] && continue
+  echo "  $ns/$name"
+  kubectl rollout restart daemonset -n "$ns" "$name" 2>/dev/null || true
+done
 
 # Trigger HPA reconciliation by adding a dummy annotation
 echo ""
@@ -112,9 +126,10 @@ echo "  CPU: ${BEFORE_CPU}m -> ~$(echo "scale=0; $BEFORE_CPU / 5" | bc)m (~$(ech
 echo "  Memory: ${BEFORE_MEM}Mi -> ~$(echo "scale=0; $BEFORE_MEM / 5" | bc)Mi (~$(echo "scale=2; $BEFORE_MEM / 5120" | bc) GB)"
 echo ""
 echo "HPAs will be set to minReplicas=1, maxReplicas=1"
+echo "Deployments and StatefulSets will be set to replicas=1"
 echo "=========================================="
 echo ""
-echo "Rollout restarts and HPA reconciliation initiated."
+echo "Rollout restarts and reconciliation initiated."
 echo "Monitor pods: kubectl get pods -A -w"
 echo "Monitor HPAs: kubectl get hpa -A"
 echo "Check reduced requests: kubectl top pods -A --sort-by=cpu | head -20"
