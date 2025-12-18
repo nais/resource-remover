@@ -1,7 +1,9 @@
 #!/bin/bash
-# remove-resource-requests.sh
-# Restarts all workloads so the mutating webhook can reduce resource requests.
-# The webhook (resource-remover) reduces CPU/memory requests to 1/10 and removes limits at pod creation.
+# cleanup.sh
+# Restarts all workloads and triggers HPA reconciliation so the mutating webhook can:
+# - Reduce resource requests to 1/10
+# - Remove limits
+# - Disable HPAs (set min/max replicas to 1)
 
 set -euo pipefail
 
@@ -88,6 +90,19 @@ restart_workloads "deployment"
 restart_workloads "statefulset" 
 restart_workloads "daemonset"
 
+# Trigger HPA reconciliation by adding a dummy annotation
+echo ""
+echo "=== Triggering HPA reconciliation ==="
+kubectl get hpa --all-namespaces -o json | jq -r --arg exclude "$EXCLUDE_PATTERN" '
+  .items[] | 
+  select(.metadata.namespace | test($exclude) | not) |
+  "\(.metadata.namespace) \(.metadata.name)"
+' | while read -r ns name; do
+  [ -z "$ns" ] && continue
+  echo "  $ns/$name"
+  kubectl annotate hpa -n "$ns" "$name" resource-remover.nais.io/reconcile="$(date +%s)" --overwrite 2>/dev/null || true
+done
+
 echo ""
 echo "=========================================="
 echo "=== SUMMARY ==="
@@ -95,8 +110,11 @@ echo "=========================================="
 echo "Resources that will be reduced to 1/10:"
 echo "  CPU: ${BEFORE_CPU}m -> ~$(echo "scale=0; $BEFORE_CPU / 10" | bc)m (~$(echo "scale=2; $BEFORE_CPU / 10000" | bc) cores)"
 echo "  Memory: ${BEFORE_MEM}Mi -> ~$(echo "scale=0; $BEFORE_MEM / 10" | bc)Mi (~$(echo "scale=2; $BEFORE_MEM / 10240" | bc) GB)"
+echo ""
+echo "HPAs will be set to minReplicas=1, maxReplicas=1"
 echo "=========================================="
 echo ""
-echo "Rollout restarts initiated."
-echo "Monitor with: kubectl get pods -A -w"
+echo "Rollout restarts and HPA reconciliation initiated."
+echo "Monitor pods: kubectl get pods -A -w"
+echo "Monitor HPAs: kubectl get hpa -A"
 echo "Check reduced requests: kubectl top pods -A --sort-by=cpu | head -20"

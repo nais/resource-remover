@@ -27,3 +27,25 @@ webhooks:
           operator: NotIn
           values:
             - kube-system
+  - name: "{{ .Release.Name }}-hpa.nais.io"
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: Ignore
+    matchPolicy: Equivalent
+    reinvocationPolicy: IfNeeded
+    clientConfig:
+      service:
+        name: "{{ .Release.Name }}"
+        namespace: "{{ .Release.Namespace }}"
+        path: /mutate-hpa
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["autoscaling"]
+        apiVersions: ["v1", "v2", "v2beta1", "v2beta2"]
+        resources: ["horizontalpodautoscalers"]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - kube-system
