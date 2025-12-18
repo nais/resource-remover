@@ -1,7 +1,7 @@
 #!/bin/bash
 # cleanup.sh
 # Restarts all workloads and triggers HPA reconciliation so the mutating webhook can:
-# - Reduce resource requests to 1/10
+# - Reduce resource requests to 20%
 # - Remove limits
 # - Disable HPAs (set min/max replicas to 1)
 
@@ -107,9 +107,9 @@ echo ""
 echo "=========================================="
 echo "=== SUMMARY ==="
 echo "=========================================="
-echo "Resources that will be reduced to 1/10:"
-echo "  CPU: ${BEFORE_CPU}m -> ~$(echo "scale=0; $BEFORE_CPU / 10" | bc)m (~$(echo "scale=2; $BEFORE_CPU / 10000" | bc) cores)"
-echo "  Memory: ${BEFORE_MEM}Mi -> ~$(echo "scale=0; $BEFORE_MEM / 10" | bc)Mi (~$(echo "scale=2; $BEFORE_MEM / 10240" | bc) GB)"
+echo "Resources that will be reduced to 20%:"
+echo "  CPU: ${BEFORE_CPU}m -> ~$(echo "scale=0; $BEFORE_CPU / 5" | bc)m (~$(echo "scale=2; $BEFORE_CPU / 5000" | bc) cores)"
+echo "  Memory: ${BEFORE_MEM}Mi -> ~$(echo "scale=0; $BEFORE_MEM / 5" | bc)Mi (~$(echo "scale=2; $BEFORE_MEM / 5120" | bc) GB)"
 echo ""
 echo "HPAs will be set to minReplicas=1, maxReplicas=1"
 echo "=========================================="

@@ -72,11 +72,11 @@ func handleMutate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Reduce resource requests to 1/10 and remove limits from all containers
+	// Reduce resource requests to 1/5 (20%) and remove limits from all containers
 	for i, container := range pod.Spec.Containers {
 		if container.Resources.Requests != nil {
 			if cpu, hasCPU := container.Resources.Requests[corev1.ResourceCPU]; hasCPU {
-				reducedCPU := cpu.MilliValue() / 10
+				reducedCPU := cpu.MilliValue() / 5
 				if reducedCPU < 1 {
 					reducedCPU = 1
 				}
@@ -87,7 +87,7 @@ func handleMutate(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 			if mem, hasMem := container.Resources.Requests[corev1.ResourceMemory]; hasMem {
-				reducedMem := mem.Value() / 10
+				reducedMem := mem.Value() / 5
 				if reducedMem < 1024*1024 {
 					reducedMem = 1024 * 1024 // minimum 1Mi
 				}
@@ -97,7 +97,7 @@ func handleMutate(w http.ResponseWriter, r *http.Request) {
 					Value: fmt.Sprintf("%d", reducedMem),
 				})
 			}
-			log.Printf("Reducing requests to 1/10 for %s/%s container %s", pod.Namespace, pod.Name, container.Name)
+			log.Printf("Reducing requests to 20%% for %s/%s container %s", pod.Namespace, pod.Name, container.Name)
 		}
 		// Remove limits so pods aren't throttled
 		if container.Resources.Limits != nil {
@@ -117,11 +117,11 @@ func handleMutate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Reduce resource requests to 1/10 and remove limits from all init containers
+	// Reduce resource requests to 20% and remove limits from all init containers
 	for i, container := range pod.Spec.InitContainers {
 		if container.Resources.Requests != nil {
 			if cpu, hasCPU := container.Resources.Requests[corev1.ResourceCPU]; hasCPU {
-				reducedCPU := cpu.MilliValue() / 10
+				reducedCPU := cpu.MilliValue() / 5
 				if reducedCPU < 1 {
 					reducedCPU = 1
 				}
@@ -132,7 +132,7 @@ func handleMutate(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 			if mem, hasMem := container.Resources.Requests[corev1.ResourceMemory]; hasMem {
-				reducedMem := mem.Value() / 10
+				reducedMem := mem.Value() / 5
 				if reducedMem < 1024*1024 {
 					reducedMem = 1024 * 1024 // minimum 1Mi
 				}
@@ -142,7 +142,7 @@ func handleMutate(w http.ResponseWriter, r *http.Request) {
 					Value: fmt.Sprintf("%d", reducedMem),
 				})
 			}
-			log.Printf("Reducing requests to 1/10 for %s/%s init container %s", pod.Namespace, pod.Name, container.Name)
+			log.Printf("Reducing requests to 20%% for %s/%s init container %s", pod.Namespace, pod.Name, container.Name)
 		}
 		if container.Resources.Limits != nil {
 			if _, hasCPU := container.Resources.Limits[corev1.ResourceCPU]; hasCPU {

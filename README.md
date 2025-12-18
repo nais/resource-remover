@@ -6,7 +6,7 @@ A Kubernetes mutating admission webhook that reduces CPU and memory requests to 
 
 ### Pod Mutations (`/mutate`)
 - Intercepts pod creation via mutating admission webhook
-- Reduces `resources.requests` (CPU and memory) to 1/10 of original values (min 1m CPU, 1Mi memory)
+- Reduces `resources.requests` (CPU and memory) to 20% of original values (min 1m CPU, 1Mi memory)
 - Removes `resources.limits` (CPU and memory) from all containers and init containers
 - Removes `cluster-autoscaler.kubernetes.io/safe-to-evict: "false"` annotations
 - Excludes `kube-system` namespace
@@ -40,7 +40,7 @@ For pods, add this to the pod template in your Deployment/StatefulSet/DaemonSet 
 ## Effects
 
 - Pods get `Burstable` QoS class (reduced requests, no limits)
-- NAP scales down since requests are 90% lower
+- NAP scales down since requests are 80% lower
 - Pods can burst beyond their requests when resources are available
 - HPAs are disabled (single replica per workload)
 - Cluster cost drops as nodes consolidate
