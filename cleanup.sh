@@ -1,7 +1,7 @@
 #!/bin/bash
 # remove-resource-requests.sh
-# Restarts all workloads so the mutating webhook can strip resource requests.
-# The webhook (resource-remover) removes CPU/memory requests and limits at pod creation.
+# Restarts all workloads so the mutating webhook can reduce resource requests.
+# The webhook (resource-remover) reduces CPU/memory requests to 1/10 and removes limits at pod creation.
 
 set -euo pipefail
 
@@ -92,11 +92,11 @@ echo ""
 echo "=========================================="
 echo "=== SUMMARY ==="
 echo "=========================================="
-echo "Resources that will be freed:"
-echo "  CPU: ${BEFORE_CPU}m (~$(echo "scale=1; $BEFORE_CPU / 1000" | bc) cores)"
-echo "  Memory: ${BEFORE_MEM}Mi (~$(echo "scale=1; $BEFORE_MEM / 1024" | bc) GB)"
+echo "Resources that will be reduced to 1/10:"
+echo "  CPU: ${BEFORE_CPU}m -> ~$(echo "scale=0; $BEFORE_CPU / 10" | bc)m (~$(echo "scale=2; $BEFORE_CPU / 10000" | bc) cores)"
+echo "  Memory: ${BEFORE_MEM}Mi -> ~$(echo "scale=0; $BEFORE_MEM / 10" | bc)Mi (~$(echo "scale=2; $BEFORE_MEM / 10240" | bc) GB)"
 echo "=========================================="
 echo ""
 echo "Rollout restarts initiated."
 echo "Monitor with: kubectl get pods -A -w"
-echo "Check requests cleared: kubectl get pods -A -o json | jq '[.items[] | select(.spec.containers[].resources.requests.cpu != null)] | length'"
+echo "Check reduced requests: kubectl top pods -A --sort-by=cpu | head -20"

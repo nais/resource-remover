@@ -72,24 +72,34 @@ func handleMutate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Remove resource requests AND limits from all containers
+	// Reduce resource requests to 1/10 and remove limits from all containers
 	for i, container := range pod.Spec.Containers {
 		if container.Resources.Requests != nil {
-			if _, hasCPU := container.Resources.Requests[corev1.ResourceCPU]; hasCPU {
+			if cpu, hasCPU := container.Resources.Requests[corev1.ResourceCPU]; hasCPU {
+				reducedCPU := cpu.MilliValue() / 10
+				if reducedCPU < 1 {
+					reducedCPU = 1
+				}
 				patches = append(patches, patchOperation{
-					Op:   "remove",
-					Path: fmt.Sprintf("/spec/containers/%d/resources/requests/cpu", i),
+					Op:    "replace",
+					Path:  fmt.Sprintf("/spec/containers/%d/resources/requests/cpu", i),
+					Value: fmt.Sprintf("%dm", reducedCPU),
 				})
 			}
-			if _, hasMem := container.Resources.Requests[corev1.ResourceMemory]; hasMem {
+			if mem, hasMem := container.Resources.Requests[corev1.ResourceMemory]; hasMem {
+				reducedMem := mem.Value() / 10
+				if reducedMem < 1024*1024 {
+					reducedMem = 1024 * 1024 // minimum 1Mi
+				}
 				patches = append(patches, patchOperation{
-					Op:   "remove",
-					Path: fmt.Sprintf("/spec/containers/%d/resources/requests/memory", i),
+					Op:    "replace",
+					Path:  fmt.Sprintf("/spec/containers/%d/resources/requests/memory", i),
+					Value: fmt.Sprintf("%d", reducedMem),
 				})
 			}
-			log.Printf("Removing requests from %s/%s container %s", pod.Namespace, pod.Name, container.Name)
+			log.Printf("Reducing requests to 1/10 for %s/%s container %s", pod.Namespace, pod.Name, container.Name)
 		}
-		// Also remove limits since K8s sets requests=limits when limits exist but requests don't
+		// Remove limits so pods aren't throttled
 		if container.Resources.Limits != nil {
 			if _, hasCPU := container.Resources.Limits[corev1.ResourceCPU]; hasCPU {
 				patches = append(patches, patchOperation{
@@ -107,22 +117,32 @@ func handleMutate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Remove resource requests AND limits from all init containers
+	// Reduce resource requests to 1/10 and remove limits from all init containers
 	for i, container := range pod.Spec.InitContainers {
 		if container.Resources.Requests != nil {
-			if _, hasCPU := container.Resources.Requests[corev1.ResourceCPU]; hasCPU {
+			if cpu, hasCPU := container.Resources.Requests[corev1.ResourceCPU]; hasCPU {
+				reducedCPU := cpu.MilliValue() / 10
+				if reducedCPU < 1 {
+					reducedCPU = 1
+				}
 				patches = append(patches, patchOperation{
-					Op:   "remove",
-					Path: fmt.Sprintf("/spec/initContainers/%d/resources/requests/cpu", i),
+					Op:    "replace",
+					Path:  fmt.Sprintf("/spec/initContainers/%d/resources/requests/cpu", i),
+					Value: fmt.Sprintf("%dm", reducedCPU),
 				})
 			}
-			if _, hasMem := container.Resources.Requests[corev1.ResourceMemory]; hasMem {
+			if mem, hasMem := container.Resources.Requests[corev1.ResourceMemory]; hasMem {
+				reducedMem := mem.Value() / 10
+				if reducedMem < 1024*1024 {
+					reducedMem = 1024 * 1024 // minimum 1Mi
+				}
 				patches = append(patches, patchOperation{
-					Op:   "remove",
-					Path: fmt.Sprintf("/spec/initContainers/%d/resources/requests/memory", i),
+					Op:    "replace",
+					Path:  fmt.Sprintf("/spec/initContainers/%d/resources/requests/memory", i),
+					Value: fmt.Sprintf("%d", reducedMem),
 				})
 			}
-			log.Printf("Removing requests from %s/%s init container %s", pod.Namespace, pod.Name, container.Name)
+			log.Printf("Reducing requests to 1/10 for %s/%s init container %s", pod.Namespace, pod.Name, container.Name)
 		}
 		if container.Resources.Limits != nil {
 			if _, hasCPU := container.Resources.Limits[corev1.ResourceCPU]; hasCPU {
