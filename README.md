@@ -18,7 +18,7 @@ A Kubernetes mutating admission webhook that reduces CPU and memory requests to 
 - Excludes `kube-system` namespace
 
 ### Replica Mutations (`/mutate-replicas`)
-- Intercepts Deployment and StatefulSet creation and updates
+- Intercepts Deployment creation and updates
 - Sets `replicas=1` to reduce workload count
 - Excludes `kube-system` namespace
 
@@ -29,6 +29,10 @@ Removing limits prevents CPU throttling and allows pods to burst when needed.
 ## Why disable HPAs and set replicas to 1?
 
 With reduced resource requests, HPAs would see high utilization and scale up aggressively. Setting replicas to 1 prevents this and saves resources. The replica mutation ensures workloads stay at 1 replica even without an HPA.
+
+## Why not StatefulSets?
+
+Replicas of a StatefulSet are *not* created equal, so you can't just remove some of them and assume everything works as before.
 
 ## Skipping workloads
 

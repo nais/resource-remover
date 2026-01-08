@@ -64,7 +64,7 @@ webhooks:
       - operations: ["CREATE", "UPDATE"]
         apiGroups: ["apps"]
         apiVersions: ["v1"]
-        resources: ["deployments", "statefulsets"]
+        resources: ["deployments"]
     namespaceSelector:
       matchExpressions:
         - key: kubernetes.io/metadata.name
